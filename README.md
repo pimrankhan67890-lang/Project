@@ -30,7 +30,7 @@ First-run setup offers synthetic example accounts and boundaries for exercising 
 
 ## Production deployment
 
-The app includes a Docker/Compose deployment path, PostgreSQL support, readiness checks, and Alembic schema migrations. Copy `.env.example` to `.env`, replace every placeholder, and use URL-safe random secrets. Generate a one-time setup token with `python -c "import secrets; print(secrets.token_urlsafe(48))"`. Set the HTTPS `PUBLIC_BASE_URL`. `SETUP_BOOTSTRAP_TOKEN` is required while the production database has no administrator; the first setup screen asks for it. Remove that token after the first administrator is created. Production mode rejects SQLite and refuses to verify presence against a demo boundary. Administrators may explicitly load one set of clearly labeled synthetic demo data from Student accounts for a product walkthrough; those records appear in production dashboards, are not attendance evidence, and must not be used for real decisions.
+The app includes a Docker/Compose deployment path, PostgreSQL support, readiness checks, and Alembic schema migrations. Copy `.env.example` to `.env`, replace every placeholder, and use URL-safe random secrets. Generate a one-time setup token with `python -c "import secrets; print(secrets.token_urlsafe(48))"`. Set the HTTPS `PUBLIC_BASE_URL`. `SETUP_BOOTSTRAP_TOKEN` is required while the production database has no administrator; the first setup screen asks for it. Remove that token after the first administrator is created. Production mode rejects SQLite and refuses to verify presence against a demo boundary. Synthetic demo data is available locally or in an explicitly enabled Vercel Preview deployment, but never in the Vercel Production environment.
 
 ### Railway deployment (Docker + PostgreSQL)
 
@@ -46,7 +46,7 @@ Add a Railway PostgreSQL database service, then set these variables on the app s
 
 Generate a public Railway domain and set the service health check path to `/api/health/ready`. Once the first deployment is healthy, open `/` and create the first administrator using the one-time setup token. Remove `SETUP_BOOTSTRAP_TOKEN` after setup and redeploy. Student sign-in is at `/student`; campus staff sign in at `/`.
 
-The PostgreSQL service is persistent; the app container filesystem is not used for records. A fresh production database does not contain local SQLite or sample records. Production disables synthetic sample data and refuses presence verification against a demo boundary. Add approved student accounts and institution-surveyed campus boundaries through the admin interface before relying on attendance records. Restrict the Google key to the Maps JavaScript API and the exact Railway hostname (for example, `https://<service>.up.railway.app/*`) plus any approved custom domain. Never commit the key. Location tracking requires HTTPS, GPS permission, and the student app to stay open and visible.
+The PostgreSQL service is persistent; the app container filesystem is not used for records. A fresh production database does not contain local SQLite or sample records. Production refuses presence verification against a demo boundary. Add approved student accounts and institution-surveyed campus boundaries through the admin interface before relying on attendance records. Restrict the Google key to the Maps JavaScript API and the exact Railway hostname (for example, `https://<service>.up.railway.app/*`) plus any approved custom domain. Never commit the key. Location tracking requires HTTPS, GPS permission, and the student app to stay open and visible.
 
 The included Alembic migrations support managed schema upgrades. Back up PostgreSQL and test restores through the institution's normal operations process.
 
@@ -61,6 +61,10 @@ The OpenStreetMap fallback requires internet access in the browser, shows visibl
 For a lost administrator login, `python admin_recovery.py` runs a local break-glass recovery prompt. It never prints or logs the password, revokes existing sessions, and records an audit event. Production recovery requires `--allow-production`; creating a replacement administrator requires `--bootstrap` and no active administrator.
 
 GPS alone cannot prove that a device is physically present or prevent location spoofing. The service enforces server-side boundaries and accuracy limits, but a production attendance policy should not treat an isolated GPS result as tamper-proof evidence.
+
+### Isolated Vercel demo environment
+
+Keep the Vercel Production environment connected only to the real production PostgreSQL database. To create a populated walkthrough, configure Vercel's Preview environment with a different, empty PostgreSQL database and set `ENABLE_DEMO_DATA=true` for Preview only. Keep `APP_ENV=production` in Preview so production security behavior remains enabled. Deploy a non-production branch to create a Preview URL, initialize its separate workspace, and choose the sample-data option or use the admin-only **Load demo data** action. The flag is honored only when Vercel identifies the deployment as Preview; Vercel Production never enables the demo action. Never point Preview and Production at the same database.
 
 ## Research and scope
 

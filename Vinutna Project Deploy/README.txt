@@ -47,14 +47,33 @@ After deployment, open the Vercel production URL and complete first-run setup wi
 the one-time SETUP_BOOTSTRAP_TOKEN. Once an administrator has been created, remove
 that variable from Vercel and redeploy. Do not share the token.
 
-OPTIONAL WALKTHROUGH DATA
-After signing in as the administrator, open Student accounts -> Load demo data and
-confirm. The app creates clearly labeled fictional student accounts, example
-presence activity, and demo geofences in this production database. A generated
-student email and temporary password are shown once; save them immediately. This
-action is one-time only. Synthetic records appear in production dashboards and must
-not be used as attendance evidence. Presence verification remains blocked for demo
-geofences.
+SEPARATE DEMO PREVIEW (RECOMMENDED)
+Keep the Vercel Production environment on the real production database. For a demo,
+create a second, empty PostgreSQL database and configure these variables under the
+Vercel Preview environment only:
+
+APP_ENV=production
+DATABASE_URL=<a different PostgreSQL URL used only by Preview>
+SETUP_BOOTSTRAP_TOKEN=<a separate one-time Preview setup token>
+ENABLE_DEMO_DATA=true
+
+Do not use the Production database URL in Preview. Keep APP_ENV=production so secure
+cookies and production protections remain enabled. The demo flag is honored only
+when Vercel identifies the deployment as Preview; the action is unavailable on the
+Production deployment. Keep the optional Google Maps key separate or use the same
+restricted browser key if its referrer restrictions include both Vercel domains.
+
+After setting Preview variables, deploy a non-production Git branch to Vercel and
+open its Preview URL. Create the first admin with the Preview bootstrap token and
+choose the sample-data checkbox during setup, or sign in and open Student accounts
+-> Load demo data. The generated synthetic student email and password are shown
+once; save them immediately. Remove the Preview bootstrap token after setup.
+Synthetic records are visibly marked and never count as real attendance. Demo
+geofences cannot verify location in production mode.
+
+If Production and Preview currently use the same DATABASE_URL, change Preview to
+the separate demo database before seeding. Existing data in a database is not
+replaced automatically.
 
 IMPORTANT BEFORE REAL ATTENDANCE
 The deployment is not connected to the university identity directory. Add approved

@@ -37,7 +37,12 @@ ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
 STATIC = ROOT / "public"
 ON_VERCEL = os.getenv("VERCEL", "").lower() in {"1", "true"}
+VERCEL_ENV = os.getenv("VERCEL_ENV", "").lower()
 APP_ENV = os.getenv("APP_ENV", "production" if ON_VERCEL else "development").lower()
+DEMO_DATA_AVAILABLE = APP_ENV != "production" or (
+    ON_VERCEL and VERCEL_ENV == "preview"
+    and os.getenv("ENABLE_DEMO_DATA", "").lower() in {"1", "true", "yes"}
+)
 configured_database_url = os.getenv("DATABASE_URL", "").strip()
 if configured_database_url:
     DATABASE_URL = configured_database_url
@@ -682,7 +687,8 @@ def map_config():
 def setup_status(db: Session = Depends(get_db)):
     count = db.scalar(select(func.count(CampusUser.id))) or 0
     return {"setup_required": count == 0, "environment": APP_ENV,
-            "bootstrap_token_required": APP_ENV == "production" and count == 0}
+            "bootstrap_token_required": APP_ENV == "production" and count == 0,
+            "sample_data_available": DEMO_DATA_AVAILABLE}
 
 
 def _new_session(db: Session, user: CampusUser, response: Response) -> dict[str, Any]:
@@ -712,7 +718,7 @@ def setup(payload: SetupInput, response: Response, db: Session = Depends(get_db)
         db.flush()
         db.add(CampusConfig(id=1, campus_name=payload.campus_name.strip(), retention_days=PRESENCE_RETENTION_DAYS))
         sample_accounts = None
-        sample_enabled = bool(payload.seed_sample and APP_ENV != "production")
+        sample_enabled = bool(payload.seed_sample and DEMO_DATA_AVAILABLE)
         if sample_enabled:
             sample_accounts = load_sample_workspace(db, user)
         audit(db, user.id, "workspace.setup", "campus",
@@ -727,6 +733,11 @@ def setup(payload: SetupInput, response: Response, db: Session = Depends(get_db)
 
 @app.post("/api/demo-data")
 def add_demo_data(auth: AuthContext = Depends(require_roles("admin")), db: Session = Depends(get_db)):
+    if not DEMO_DATA_AVAILABLE:
+        raise HTTPException(404, "Demo data is disabled for this deployment.")
+    config = db.scalar(select(CampusConfig).where(CampusConfig.id == 1).with_for_update())
+    if not config:
+        raise HTTPException(409, "Initialize the campus workspace before loading demo data.")
     existing_demo = db.scalar(select(func.count(Geofence.id)).where(Geofence.demo_boundary.is_(True))) or 0
     existing_demo += db.scalar(select(func.count(PresenceEvent.id)).where(PresenceEvent.demo_record.is_(True))) or 0
     if existing_demo or db.scalar(select(CampusUser.id).where(
@@ -802,7 +813,8 @@ def dashboard(auth: AuthContext = Depends(get_auth), db: Session = Depends(get_d
                     PresenceEvent.created_at >= today_start,
                     PresenceEvent.created_at < tomorrow_start)) or 0,
                 "latest_event": event_payload(db, latest) if latest else None,
-                "consent": consent_payload(consent)}
+                "consent": consent_payload(consent),
+                "demo_data_available": False}
     active_sessions = db.scalars(select(PresenceSession).where(PresenceSession.status == "active")).all()
     counts = {"campus_entry": 0, "campus_exit": 0, "zone_entry": 0, "zone_exit": 0, "location_review": 0}
     for event_type in counts:
@@ -826,7 +838,9 @@ def dashboard(auth: AuthContext = Depends(get_auth), db: Session = Depends(get_d
             "active_sessions": len(active_sessions), "geofence_count": len(zones),
             "active_geofences": sum(1 for z in zones if z.active), "today": counts,
             "zones": occupancy, "unread_notifications": unread,
-            "demo_data_present": demo, "updated_at": iso(utcnow())}
+            "demo_data_present": demo,
+            "demo_data_available": DEMO_DATA_AVAILABLE and auth.user.role == "admin",
+            "updated_at": iso(utcnow())}
 
 
 def student_access(auth: AuthContext, user_id: int):
