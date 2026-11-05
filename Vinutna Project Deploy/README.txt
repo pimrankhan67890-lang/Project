@@ -47,6 +47,15 @@ After deployment, open the Vercel production URL and complete first-run setup wi
 the one-time SETUP_BOOTSTRAP_TOKEN. Once an administrator has been created, remove
 that variable from Vercel and redeploy. Do not share the token.
 
+OPTIONAL WALKTHROUGH DATA
+After signing in as the administrator, open Student accounts -> Load demo data and
+confirm. The app creates clearly labeled fictional student accounts, example
+presence activity, and demo geofences in this production database. A generated
+student email and temporary password are shown once; save them immediately. This
+action is one-time only. Synthetic records appear in production dashboards and must
+not be used as attendance evidence. Presence verification remains blocked for demo
+geofences.
+
 IMPORTANT BEFORE REAL ATTENDANCE
 The deployment is not connected to the university identity directory. Add approved
 accounts and replace all demo geofences with institution-surveyed campus boundaries

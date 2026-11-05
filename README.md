@@ -30,7 +30,7 @@ First-run setup offers synthetic example accounts and boundaries for exercising 
 
 ## Production deployment
 
-The app includes a Docker/Compose deployment path, PostgreSQL support, readiness checks, and Alembic schema migrations. Copy `.env.example` to `.env`, replace every placeholder, and use URL-safe random secrets. Generate a one-time setup token with `python -c "import secrets; print(secrets.token_urlsafe(48))"`. Set the HTTPS `PUBLIC_BASE_URL`. `SETUP_BOOTSTRAP_TOKEN` is required while the production database has no administrator; the first setup screen asks for it. Remove that token after the first administrator is created. Production mode rejects SQLite and refuses to verify presence against a demo boundary.
+The app includes a Docker/Compose deployment path, PostgreSQL support, readiness checks, and Alembic schema migrations. Copy `.env.example` to `.env`, replace every placeholder, and use URL-safe random secrets. Generate a one-time setup token with `python -c "import secrets; print(secrets.token_urlsafe(48))"`. Set the HTTPS `PUBLIC_BASE_URL`. `SETUP_BOOTSTRAP_TOKEN` is required while the production database has no administrator; the first setup screen asks for it. Remove that token after the first administrator is created. Production mode rejects SQLite and refuses to verify presence against a demo boundary. Administrators may explicitly load one set of clearly labeled synthetic demo data from Student accounts for a product walkthrough; those records appear in production dashboards, are not attendance evidence, and must not be used for real decisions.
 
 ### Railway deployment (Docker + PostgreSQL)
 

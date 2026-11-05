@@ -362,11 +362,12 @@
   }
 
   async function renderStudents(){
-    const data=await api(`/api/students?q=${encodeURIComponent(state.studentSearch)}&status=${encodeURIComponent(state.studentStatus)}`);
+    const [data,dash]=await Promise.all([api(`/api/students?q=${encodeURIComponent(state.studentSearch)}&status=${encodeURIComponent(state.studentStatus)}`),api('/api/dashboard')]);
+    state.lastDashboard=dash;
     const rows=data.items;
     const table=rows.length?`<div class="data-table-wrap"><table class="data-table"><thead><tr><th>Student</th><th>Department</th><th>Presence now</th><th>Last verified</th><th>Account</th><th></th></tr></thead><tbody>${rows.map(s=>`<tr><td><div class="student-cell"><span class="avatar">${esc(initials(s.full_name))}</span><span><span class="student-name">${esc(s.full_name)}</span><span class="student-meta">${esc(s.student_no||'')}</span></span></div></td><td>${esc(s.department||'—')}</td><td>${s.presence_status==='inside'?`<span class="status-pill status-inside">${esc(s.current_zone||'On campus')}</span>`:'<span class="status-pill status-outside">Outside</span>'}</td><td class="time-text">${esc(humanAgo(s.last_seen_at))}</td><td><span class="status-pill ${s.active?'status-inside':'status-review'}">${s.active?'Active':'Disabled'}</span></td><td>${state.user.role==='admin'?`<button class="edit-link" data-action="edit-student" data-id="${s.id}">Manage</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:`<div class="table-empty">No students found.</div>`;
-    const actions=state.user.role==='admin'?`<button class="primary-button" data-action="add-student">${icon('plus')} Add student</button><button class="outline-button" data-action="add-security">${icon('shield')} Add staff account</button>`:'';
-    return `${pageHead('Student accounts','Manage the student identities used for presence verification.',actions)}${state.user.role==='admin'?`<div class="notice-strip"><span class="notice-icon">i</span><span>Only the minimum identity details needed for campus presence are stored. Send initial credentials through Vignan’s approved channel.</span></div>`:''}<section class="panel table-panel"><div class="panel-head"><div class="panel-title"><span class="title-icon">${icon('people')}</span><span><h2>Students</h2><small>${data.total} account${data.total===1?'':'s'} in this result</small></span></div></div><div class="table-tools"><div class="tool-group"><label class="search-field">${icon('search')}<input id="student-search" value="${esc(state.studentSearch)}" placeholder="Search name, student number, email"></label><select class="select-input" id="student-status"><option value="all" ${state.studentStatus==='all'?'selected':''}>All presence</option><option value="inside" ${state.studentStatus==='inside'?'selected':''}>On campus</option><option value="outside" ${state.studentStatus==='outside'?'selected':''}>Outside</option></select></div><span class="student-meta">Presence access uses role checks</span></div>${table}<div class="table-bottom"><span>Student credentials are never shown after account creation.</span><span>Reset access from Manage.</span></div></section>`;
+    const actions=state.user.role==='admin'?`<button class="primary-button" data-action="add-student">${icon('plus')} Add student</button><button class="outline-button" data-action="add-security">${icon('shield')} Add staff account</button><button class="outline-button" data-action="show-demo-data">Load demo data</button>`:'';
+    return `${pageHead('Student accounts','Manage the student identities used for presence verification.',actions)}${dash.demo_data_present?demoBanner('Synthetic student accounts are in this production database; do not treat them as real records.'):''}${state.user.role==='admin'?`<div class="notice-strip"><span class="notice-icon">i</span><span>Only the minimum identity details needed for campus presence are stored. Send initial credentials through Vignan’s approved channel.</span></div>`:''}<section class="panel table-panel"><div class="panel-head"><div class="panel-title"><span class="title-icon">${icon('people')}</span><span><h2>Students</h2><small>${data.total} account${data.total===1?'':'s'} in this result</small></span></div></div><div class="table-tools"><div class="tool-group"><label class="search-field">${icon('search')}<input id="student-search" value="${esc(state.studentSearch)}" placeholder="Search name, student number, email"></label><select class="select-input" id="student-status"><option value="all" ${state.studentStatus==='all'?'selected':''}>All presence</option><option value="inside" ${state.studentStatus==='inside'?'selected':''}>On campus</option><option value="outside" ${state.studentStatus==='outside'?'selected':''}>Outside</option></select></div><span class="student-meta">Presence access uses role checks</span></div>${table}<div class="table-bottom"><span>Student credentials are never shown after account creation.</span><span>Reset access from Manage.</span></div></section>`;
   }
 
   async function renderZones(){
@@ -636,6 +637,25 @@
       else if(action==='refresh'){await loadView();toast('Campus view refreshed.');}
       else if(action==='add-student')showStudentModal();
       else if(action==='add-security')showSecurityModal();
+      else if(action==='show-demo-data'){
+        openModal(`${modalHead('Load synthetic demo data?','This adds fictional students, sample presence events, and demo geofences to the live production database.')}
+          <div class="modal-body"><div class="notice-strip danger"><span class="notice-icon">!</span><span>These records are not real attendance. They will appear in dashboards and cannot be loaded twice. Production blocks presence verification against demo boundaries.</span></div></div>
+          <div class="modal-actions"><button class="outline-button" data-action="close-modal">Cancel</button><button class="danger-button" data-action="confirm-demo-data">Load demo data</button></div>`);
+      }
+      else if(action==='confirm-demo-data'){
+        actionEl.disabled=true;
+        const result=await postJson('/api/demo-data',{});
+        state.demoLogin=result.demo_student_login||null;
+        closeModal();
+        await loadView(false);
+        if(state.demoLogin){
+          openModal(`${modalHead('Demo data loaded','Use this synthetic student sign-in to test the student screen. Save these credentials now; the password will not be shown again.')}
+            <div class="demo-credential">${esc(state.demoLogin.student_email)}<br>${esc(state.demoLogin.student_password)}</div>
+            <div class="field-hint" style="margin-top:8px">Fictional account only. Demo data appears in production dashboards and must not be used as attendance evidence.</div>
+            <div class="modal-actions"><button class="primary-button" data-action="close-modal">Done</button></div>`);
+        }
+        toast(result.warning||'Synthetic demo data loaded.');
+      }
       else if(action==='toggle-staff'){const active=actionEl.dataset.active==='true';await postJson(`/api/staff/${actionEl.dataset.id}`,{active:!active},'PATCH');toast(active?'Staff access disabled.':'Staff access restored.');await loadView(false);}
       else if(action==='edit-student'){
         const response=await api('/api/students?q='+encodeURIComponent(state.studentSearch));

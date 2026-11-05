@@ -725,6 +725,21 @@ def setup(payload: SetupInput, response: Response, db: Session = Depends(get_db)
         return result
 
 
+@app.post("/api/demo-data")
+def add_demo_data(auth: AuthContext = Depends(require_roles("admin")), db: Session = Depends(get_db)):
+    existing_demo = db.scalar(select(func.count(Geofence.id)).where(Geofence.demo_boundary.is_(True))) or 0
+    existing_demo += db.scalar(select(func.count(PresenceEvent.id)).where(PresenceEvent.demo_record.is_(True))) or 0
+    if existing_demo or db.scalar(select(CampusUser.id).where(
+            CampusUser.email == "presence.student@example.invalid")):
+        raise HTTPException(409, "Synthetic demo data is already present; it cannot be loaded twice.")
+    demo_login = load_sample_workspace(db, auth.user)
+    audit(db, auth.user.id, "workspace.demo_data_loaded", "campus",
+          details={"sample_data": True})
+    db.commit()
+    return {"sample_data_loaded": True, "demo_student_login": demo_login,
+            "warning": "Synthetic records are not real attendance data. Demo geofences cannot verify presence in production."}
+
+
 @app.post("/api/auth/login")
 def login(payload: LoginInput, request: Request, response: Response, db: Session = Depends(get_db)):
     ip = request.client.host if request.client else "unknown"
@@ -1377,4 +1392,3 @@ def load_sample_workspace(db: Session, admin: CampusUser) -> dict[str, Any]:
     sample_data(db, admin)
     student, temp_password = create_demo_student_login(db, admin)
     return {"student_email": student.email, "student_password": temp_password}
-
